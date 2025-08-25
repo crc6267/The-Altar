@@ -10,7 +10,7 @@ __pycache__/
 venv/
 .env/
 .env.bak/
-.venv/
+.altar_env/
 pip-wheel-metadata/
 
 # Jupyter Notebook checkpoints
