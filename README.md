@@ -1,4 +1,4 @@
-# 🕯️ The Altar App
+# 🕯️ The Altar App  
 
 > _“The lot is cast into the lap, but the whole disposing thereof is of the Lord.”_  
 > — **Proverbs 16:33**
@@ -40,7 +40,7 @@ git clone https://github.com/<your-username>/altar-app.git
 cd altar-app
 ```
 
-### **1. Create and Activate**
+### **2. Create and Activate a Virtual Environment**
 
 ```bash
 python -m venv venv
@@ -50,4 +50,15 @@ python -m venv venv
 venv\Scripts\activate
 # On macOS/Linux:
 source venv/bin/activate
+```
+### **3. Install Dependencies**
+
+```bash
+pip install -r requirements.txt
+```
+
+### **4. Run the App**
+
+```bash
+python chatbot.py
 ```
