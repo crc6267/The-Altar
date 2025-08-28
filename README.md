@@ -36,7 +36,7 @@ This app is not meant to replace time in prayer or Scripture but to invite you t
 ### **1. Clone the Repository**
 
 ```bash
-git clone https://github.com/<your-username>/altar-app.git
+git clone https://github.com/crc6267/altar-app.git
 cd altar-app
 ```
 
