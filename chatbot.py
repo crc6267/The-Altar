@@ -7,16 +7,12 @@ from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 
-# This will let us use the Ollama model
 from langchain_ollama import ChatOllama
 
-from bible.bible_tools import random_chapter, select_chapter
+from bible_tools import random_chapter, select_chapter
 TOOLS = [random_chapter, select_chapter]
 
 class State(TypedDict):
-    # Messages have the type "list". The `add_messages` function
-    # in the annotation defines how this state key should be updated
-    # (in this case, it appends messages to the list, rather than overwriting them)
     messages: Annotated[list, add_messages]
 
 graph_builder = StateGraph(State)
@@ -30,21 +26,10 @@ main_model = ChatOllama(
 def chatbot(state: State):
     return {"messages": [main_model.invoke(state["messages"])]}
 
-# The first argument is the unique node name
-# The second argument is the function or object that will be called whenever
-# the node is used.
 graph_builder.add_node("chatbot", chatbot)
-
 tool_node = ToolNode(tools=TOOLS)
 graph_builder.add_node("tools", tool_node)
-
 graph_builder.add_conditional_edges("chatbot", tools_condition)
-
-# Define start and end nodes
-# graph_builder.add_edge(START, "chatbot")
-# graph_builder.add_edge("chatbot", END)
-
-# Any time a tool is called, we return to the chatbot to decide the next step
 graph_builder.add_edge("tools", "chatbot")
 graph_builder.add_edge(START, "chatbot")
 graph = graph_builder.compile()
@@ -91,7 +76,6 @@ def stream_graph_updates(user_input: str):
                 continue
             last = msgs[-1]
 
-            # Final, user-facing AI message = type 'ai' and NO tool_calls
             if getattr(last, "type", None) == "ai" and not getattr(last, "tool_calls", None):
                 content = last.content
                 if isinstance(content, list):
@@ -103,7 +87,6 @@ def stream_graph_updates(user_input: str):
                     print("Assistant:", content)
                     seen = content
 
-
 while True:
     try:
         user_input = input("User: ")
@@ -112,7 +95,6 @@ while True:
             break
         stream_graph_updates(user_input)
     except:
-        # fallback if input() is not available
         user_input = "What do you know about LangGraph?"
         print("User: " + user_input)
         stream_graph_updates(user_input)
