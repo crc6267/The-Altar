@@ -33,14 +33,29 @@ This app is not meant to replace time in prayer or Scripture but to invite you t
 
 ## **Getting Started**
 
-### **1. Clone the Repository**
+### **Before cloning the repo, head over to [Ollama's website](https://ollama.com/download) and download Ollama if you do not have it installed. Ollama allows you to run powerful LLMs locally and for free!**
+
+#### **After installation, run the following command to confirm its active**
+```bash
+ollama --version
+```
+
+#### Now, simply:
+```bash
+# See ollama's model list to try out different models. You can replace this model with a different one in altar.py -- just make sure you use this command to pull the model you want to use
+ollama pull gpt-oss:20b
+```
+
+
+
+### **Clone the Repository**
 
 ```bash
 git clone https://github.com/crc6267/altar-app.git
 cd altar-app
 ```
 
-### **2. Create and Activate a Virtual Environment**
+### **Create and Activate a Virtual Environment**
 
 ```bash
 python -m venv venv
@@ -51,13 +66,13 @@ venv\Scripts\activate
 # On macOS/Linux:
 source venv/bin/activate
 ```
-### **3. Install Dependencies**
+### **Install Dependencies**
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### **4. Run the App**
+### **Run the App**
 
 ```bash
 python chatbot.py
