@@ -28,22 +28,7 @@ def random_chapter():
     book = random.choice(list(bible.keys()))
     chapter = random.choice(list(bible[book].keys()))
     print('We are in random_chapter')
-    # return book, chapter, chapter_text_from(bible[book][chapter]) 
     return {"scripture_ref": f"{book} {chapter}", "scripture_text": bible[book][chapter]}
-
-def chapter_text_from(verses):
-    '''
-    Given the verses of a chapter, return the full chapter text.
-     Verses can be a dict of verse_no -> text, or a raw string.
-     
-    Returns a formatted string of the chapter text.  
-    '''
-    # handle dict of verse_no -> text, or raw string
-    if isinstance(verses, dict):
-        ordered_keys = sorted(verses, key=lambda x: int(x) if str(x).isdigit() else str(x))
-        return "\n".join(f"{v}. {verses[v]}" for v in ordered_keys)
-    
-    return str(verses)
 
 def select_chapter(book: str, chapter: str):
     """
