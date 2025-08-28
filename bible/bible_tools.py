@@ -49,6 +49,7 @@ def select_chapter(book: str, chapter: str):
     """
     Returns the scripture text if found; otherwise signals 'not_found'.
     """
+
     bible = load_bible()
     if book in bible and chapter in bible[book]:
         return {
