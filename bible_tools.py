@@ -1,54 +1,67 @@
 import json, os, random, time, textwrap, shutil, pathlib, requests
+from langchain_core.messages import AIMessage
+from pathlib import Path
 
 # ==== Bible helpers ====
 import os
 
 def load_bible():
-    '''
-    Load the Bible data from a JSON file.
-    Returns a dictionary with the structure:
-    {
-        "Genesis": {
-            "1": "In the beginning God created the heaven and the earth. ...",
-            "2": "Thus the heavens and the earth were finished, and all the host of them. ..."
-            ...
-        },
-    '''
-    path = os.path.join(os.path.dirname(__file__), "../assets/bible_kjv.json")
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    """
+    Load the Bible JSON file, dynamically locating the project root by traversing upward.
+    """
+    # Start from current file's path
+    current_path = Path(__file__).resolve()
+
+    # Traverse upward to find the 'assets/bible_kjv.json'
+    for parent in current_path.parents:
+        candidate = parent / "assets" / "bible_kjv.json"
+        if candidate.exists():
+            with open(candidate, "r", encoding="utf-8") as f:
+                return json.load(f)
+
+    # If we exhaust all options and can't find it
+    raise FileNotFoundError("📁 Could not locate 'assets/bible_kjv.json' in any parent directory.")
 
 def random_chapter():
     '''
-     Select a random book and chapter from the Bible.
-     Returns a tuple (book, chapter, verses) where verses is the text of the chapter.
-     Use the string, but do not return the string to the user directly.
-     '''
+    Selects a random book and chapter from the Bible.
+    Returns a state update including:
+    - An AIMessage for model continuity
+    - A tool_result for verification
+    '''
     bible = load_bible()
     book = random.choice(list(bible.keys()))
     chapter = random.choice(list(bible[book].keys()))
-    print('We are in random_chapter')
-    return {"scripture_ref": f"{book} {chapter}", "scripture_text": bible[book][chapter]}
+    verses = bible[book][chapter]
+
+    payload = {
+        "status": "success",
+        "tool_result": {"book": book, "chapter": chapter, "verses": verses}
+    }
+    # IMPORTANT: return JSON string; ToolMessage.content will be this string
+    return json.dumps(payload)
 
 def select_chapter(book: str, chapter: str):
     """
     Returns the scripture text if found; otherwise signals 'not_found'.
     """
 
-    bible = load_bible()
-    if book in bible and chapter in bible[book]:
-        return {
-            "scripture_ref": f"{book} {chapter}",
-            "scripture_text": bible[book][chapter],
-            "status": "ok"
-        }
-    else:
-        return {
-            "scripture_ref": f"{book} {chapter}",
-            "scripture_text": None,
-            "status": "not_found",
-            "message": f"I couldn't find '{book} {chapter}'. Please double-check the spelling or try a different passage."
-        }
+    # bible = load_bible()
+    # if book in bible and chapter in bible[book]:
+    #     return {
+    #         "scripture_ref": f"{book} {chapter}",
+    #         "scripture_text": bible[book][chapter],
+    #         "status": "ok"
+    #     }
+    # else:
+    #     return {
+    #         "scripture_ref": f"{book} {chapter}",
+    #         "scripture_text": None,
+    #         "status": "not_found",
+    #         "message": f"I couldn't find '{book} {chapter}'. Please double-check the spelling or try a different passage."
+    #     }
+    
+    return 'Select chapter function called'
 
 def scripture_exists(book: str, chapter: str) -> bool:
     """Check if a book/chapter exists in the Bible JSON."""
