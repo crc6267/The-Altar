@@ -33,6 +33,8 @@ def random_chapter():
     book = random.choice(list(bible.keys()))
     chapter = random.choice(list(bible[book].keys()))
     verses = bible[book][chapter]
+    
+    print("\n\n R A N D O M  C H A P T E R  C A L L E D")
 
     payload = {
         "status": "success",
@@ -46,22 +48,20 @@ def select_chapter(book: str, chapter: str):
     Returns the scripture text if found; otherwise signals 'not_found'.
     """
 
-    # bible = load_bible()
-    # if book in bible and chapter in bible[book]:
-    #     return {
-    #         "scripture_ref": f"{book} {chapter}",
-    #         "scripture_text": bible[book][chapter],
-    #         "status": "ok"
-    #     }
-    # else:
-    #     return {
-    #         "scripture_ref": f"{book} {chapter}",
-    #         "scripture_text": None,
-    #         "status": "not_found",
-    #         "message": f"I couldn't find '{book} {chapter}'. Please double-check the spelling or try a different passage."
-    #     }
+    print("\n\n S E L E C T  C H A P T E R  C A L L E D")
     
-    return 'Select chapter function called'
+    bible = load_bible()
+    if book in bible and chapter in bible[book]:
+        return {
+            "status": "success",
+            "tool_result": {"book": book, "chapter": chapter, "verses": bible[book][chapter]}
+        }
+    else:
+        return {
+            "status": "not_found",
+            "message": f"I couldn't find '{book} {chapter}'. Please double-check the spelling or try a different passage."
+        }
+    
 
 def scripture_exists(book: str, chapter: str) -> bool:
     """Check if a book/chapter exists in the Bible JSON."""

@@ -4,11 +4,13 @@ from typing_extensions import TypedDict
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage, BaseMessage
 
 import json
 
 from langchain_ollama import ChatOllama
+
+import traceback
 
 from bible_tools import random_chapter, select_chapter
 BIBLE_TOOLS = [random_chapter, select_chapter]
@@ -18,7 +20,10 @@ from prompt import SYSTEM_PROMPT
 # TODO: Make altar state class
 class State(TypedDict):
     messages: Annotated[list, add_messages]
-    bible_info: Optional[dict]
+    bible_info: Optional[dict] # This holds the book, chapter, and verses
+    anchor_theme: Optional[str]
+    user_theme: Optional[str]
+    user_input: Optional[str]
 
 graph_builder = StateGraph(State)
 
@@ -46,8 +51,11 @@ def chatbot1(state):
             # TODO Perhaps we can make a change state function that decides what to do, that way the logic is centralized
             return  {
                 "messages": state["messages"] + [AIMessage(content=f"✅ Tool result received: {book} {chapter} with {len(verses)} verses.")],
-                "test_param": "New value from chatbot1",
-                "bible_info": {"book": book, "chapter": chapter, "verses": verses}
+                "bible_info": {"book": book, "chapter": chapter, "verses": verses},
+                "anchor_theme": None,
+                "user_theme": None,
+                "user_input": state["user_input"],
+                
             }
         else:
             return {
@@ -63,7 +71,17 @@ def chatbot1(state):
 
 def chatbot2(state):
     # Seed the prompt for reflection or summarization
-    prompt = f"Summarize the key message of {state['bible_info']['book']} {state['bible_info']['chapter']}, here is the kjv version: {state['bible_info']['verses']}"
+    prompt = f"""
+        You are a summarizer and literary analyzer. Your job is to provide a 3 word summary or analysis of two things - The users statement and the bible verse provided.
+        
+        The bible summarization will serve as the anchor theme for the rest of this program.
+        
+        Here is the Bible verse to summarize: {state['bible_info']['book']} {state['bible_info']['chapter']}: {state['bible_info']['verses']}
+        
+        Here is the user's input: {state["user_input"]}
+        
+        Please return the format as a json string with the keys "anchor_theme" and "user_theme"
+        """
     reply = main_model.invoke([HumanMessage(content=prompt)])
 
     return {
@@ -138,15 +156,15 @@ graph_builder.add_edge(START, "chatbot1")
 graph = graph_builder.compile()
 
 print("=== Running the graph ===")
-for step in graph.stream({"messages": ["Can you pick a random verse for me?"], "bible_info": None}, stream_mode="updates"):
-    node_name, delta = next(iter(step.items()))
-    print(f"→ {node_name}")
-    for k, v in delta.items():
-        print(f"   {k}: {v}")
+# for step in graph.stream({"messages": ["Can you pick a random verse for me?"], "bible_info": None}, stream_mode="updates"):
+#     node_name, delta = next(iter(step.items()))
+#     print(f"→ {node_name}")
+#     for k, v in delta.items():
+#         print(f"   {k}: {v}")
 
-from IPython.display import Image, display
+# from IPython.display import Image, display
 
-from pathlib import Path
+# from pathlib import Path
 
 # Get the PNG bytes from LangGraph
 # png_bytes = graph.get_graph().draw_mermaid_png()
@@ -180,52 +198,51 @@ from pathlib import Path
 # # call it:
 # save_langgraph_png(graph, "langgraph.png")
 
-# def stream_graph_updates(user_input: str):
-#     seen = None
-#     for event in graph.stream({
-#         "messages": [
-#             {
-#                 "role": "system",
-#                 "content": SYSTEM_PROMPT   
-#             },
-#             {"role": "user", "content": user_input}
-#         ]
-#     }):
-#         for state in event.values():
-#             msgs = state.get("messages", [])
-#             if not msgs:
-#                 continue
-#             last = msgs[-1]
+def stream_graph_updates(user_input: str):
+    seen = None
+    for event in graph.stream({
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are a helpful bible assistant"   
+            },
+            {"role": "user", "content": user_input}
+        ],
+        "bible_info": {}, "anchor_theme": None, "user_theme": None,
+        "user_input": user_input
+    }):
+        for state in event.values():
+            msgs = state.get("messages", [])
+            if not msgs:
+                continue
+            last = msgs[-1]
 
-#             if getattr(last, "type", None) == "ai" and not getattr(last, "tool_calls", None):
-#                 content = last.content
-#                 if isinstance(content, list):
-#                     content = "".join(
-#                         (p.get("text", "") if isinstance(p, dict) else str(p))
-#                         for p in content
-#                     )
-#                 if content and content != seen:
-#                     print("\n\n =============================== Start of Devotion ================================ \n")
-#                     print("Assistant:", content)
-#                     print("\n\n ================================ End of Devotion ================================= \n")
-#                     seen = content
+            if getattr(last, "type", None) == "ai" and not getattr(last, "tool_calls", None):
+                content = last.content
+                if isinstance(content, list):
+                    content = "".join(
+                        (p.get("text", "") if isinstance(p, dict) else str(p))
+                        for p in content
+                    )
+                if content and content != seen:
+                    print("Assistant:", content)
+                    seen = content
 
-# while True:
-#     print("Proverbs 16:33 — 'The lot is cast into the lap, but the whole disposing thereof is of the LORD.'\n")
-#     print("This is not an oracle, but an assistant to help you reflect on what the Spirit might be saying to YOU through His word.\n")
-#     print("\n#1 Step into the altar. Please grab your bible\n")
-#     print("#2 Take a moment to center yourself and think about what is weighing on your heart.\n")
-#     print("#3 Flip to a random book and chapter in the Bible.\n")
-#     print("#4 Share your situation or question, and provide the book and chapter you flipped to.\n")
+while True:
+    print("Proverbs 16:33 — 'The lot is cast into the lap, but the whole disposing thereof is of the LORD.'\n")
+    print("This is not an oracle, but an assistant to help you reflect on what the Spirit might be saying to YOU through His word.\n")
+    print("\n#1 Step into the altar. Please grab your bible\n")
+    print("#2 Take a moment to center yourself and think about what is weighing on your heart.\n")
+    print("#3 Flip to a random book and chapter in the Bible.\n")
+    print("#4 Share your situation or question, and provide the book and chapter you flipped to.\n")
 
-#     try:
-#         user_input = input("Enter petition: ")
-#         if user_input.lower() in ["quit", "exit", "q"]:
-#             print("Goodbye!")
-#             break
-#         stream_graph_updates(user_input)
-#     except:
-#         user_input = "What do you know about LangGraph?"
-#         print("User: " + user_input)
-#         stream_graph_updates(user_input)
-#         break
+    try:
+        user_input = input("Enter petition: ")
+        if user_input.lower() in ["quit", "exit", "q"]:
+            print("Goodbye!")
+            break
+        stream_graph_updates(user_input)
+    except Exception as e:
+        print("something went wrong:", e)
+        traceback.print_exc()
+        
