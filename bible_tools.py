@@ -39,7 +39,7 @@ def random_chapter():
         "tool_result": {"book": book, "chapter": chapter, "verses": verses}
     }
     # IMPORTANT: return JSON string; ToolMessage.content will be this string
-    return json.dumps(payload)
+    return payload
 
 def select_chapter(book: str, chapter: str):
     """

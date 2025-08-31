@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Optional
 from typing_extensions import TypedDict
 
 from langgraph.graph import StateGraph, START, END
@@ -17,6 +17,7 @@ from prompt import SYSTEM_PROMPT
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]
+    test_param: str
 
 graph_builder = StateGraph(State)
 
@@ -26,16 +27,35 @@ main_model = ChatOllama(
     callbacks=[]
 ).bind_tools(BIBLE_TOOLS)
 
+your_name = "Jessica"
+your_name[0]
+
+roman = {
+    "isHeBoof?": True
+}
+
+roman["isHeBoof?"]
+
 def chatbot1(state):
-    if "tool_result" in state and not state.get("tool_result_verified"):
-        result = state["tool_result"]
-        book = result.get("book")
-        chapter = result.get("chapter")
-        verses = result.get("verses")
+    #Check if we have a tool_result to verify
+    if state["messages"][-1] and isinstance(state["messages"][-1], ToolMessage):
+        last_message = state["messages"][-1]
+        content = json.loads(last_message.content)
+        tool_result = content["tool_result"]
+        print('\n\nIn chatbot1 with tool_result:', content, "\n\n")
+        book = tool_result["book"]
+        chapter = tool_result.get("chapter")
+        verses = tool_result.get("verses")
+        print('\n\nIn chatbot1 with book:', book, "\n\n")
+        print('\n\nIn chatbot1 with chapter:', chapter, "\n\n")
+        print('\n\nIn chatbot1 with verses:', verses[:100] if verses else None, "\n\n")
+        
         if book and chapter:
             # Add a clean handoff message but preserve state
-            return {
-                "messages": state["messages"] + [AIMessage(content=f"Verified passage: {book} {chapter}.", type="ai", tool_calls=[])] + [ToolMessage(content=json.dumps({"name": "select_chapter", "arguments": {"book": book, "chapter": chapter, "verses": verses}}), type="tool", tool_calls=[])],
+            return  {
+                **state,
+                "messages": state["messages"] + [AIMessage(content=f"✅ Tool result received: {book} {chapter} with {len(verses)} verses.")],
+                "test_param": "New value from chatbot1",
             }
         else:
             return {
@@ -59,10 +79,14 @@ def chatbot2(state):
     print('\n\nIn chatbot2 with chapter:', chapter, "\n\n")
     verses = result.get("verses")
     print('\n\nIn chatbot2 with verses:', verses[:100] if verses else None, "\n\n")
+    yo = state["test_param"]
+    print('\n\nIn chatbot2 with verses:', yo, "\n\n")
+    
 
     if not (book and chapter and verses):
         return {
             "messages": state["messages"] + [AIMessage(content="❌ Missing or invalid tool result; cannot proceed.")]
+            
         }
 
     # Seed the prompt for reflection or summarization
@@ -141,7 +165,7 @@ graph_builder.add_edge(START, "chatbot1")
 graph = graph_builder.compile()
 
 print("=== Running the graph ===")
-for step in graph.stream({"messages": ["Can you pick a random verse for me?"]}, stream_mode="updates"):
+for step in graph.stream({"messages": ["Can you pick a random verse for me?"], "test_param": 'hello'}, stream_mode="updates"):
     node_name, delta = next(iter(step.items()))
     print(f"→ {node_name}")
     for k, v in delta.items():
@@ -152,7 +176,7 @@ from IPython.display import Image, display
 from pathlib import Path
 
 # Get the PNG bytes from LangGraph
-png_bytes = graph.get_graph().draw_mermaid_png()
+# png_bytes = graph.get_graph().draw_mermaid_png()
 
 # Try to render in a notebook; otherwise save to a file
 
