@@ -15,9 +15,9 @@ BIBLE_TOOLS = [random_chapter, select_chapter]
 
 from prompt import SYSTEM_PROMPT
 
+# TODO: Make altar state class
 class State(TypedDict):
     messages: Annotated[list, add_messages]
-    test_param: str
     bible_info: Optional[dict]
 
 graph_builder = StateGraph(State)
@@ -29,22 +29,21 @@ main_model = ChatOllama(
 ).bind_tools(BIBLE_TOOLS)
 
 def chatbot1(state):
-    #Check if we have a tool_result to verify
+    # If there is a last message and its a tool message
     if state["messages"][-1] and isinstance(state["messages"][-1], ToolMessage):
+        # Get most recent message
         last_message = state["messages"][-1]
         # NOTE: The tool message content is always a json string. You must parse it before treating it like an object
         content = json.loads(last_message.content)
+        # Now we can dissect the json object
         tool_result = content["tool_result"]
-        print('\n\nIn chatbot1 with tool_result:', content, "\n\n")
         book = tool_result["book"]
         chapter = tool_result.get("chapter")
         verses = tool_result.get("verses")
-        print('\n\nIn chatbot1 with book:', book, "\n\n")
-        print('\n\nIn chatbot1 with chapter:', chapter, "\n\n")
-        print('\n\nIn chatbot1 with verses:', verses[:100] if verses else None, "\n\n")
         
-        if book and chapter:
-            # Add a clean handoff message but preserve state
+        if book and chapter and verses:
+            # Update the state
+            # TODO Perhaps we can make a change state function that decides what to do, that way the logic is centralized
             return  {
                 "messages": state["messages"] + [AIMessage(content=f"✅ Tool result received: {book} {chapter} with {len(verses)} verses.")],
                 "test_param": "New value from chatbot1",
@@ -59,12 +58,10 @@ def chatbot1(state):
     # Normal model behavior
     reply = main_model.invoke(state["messages"])
     return {
-        "messages": state["messages"] + [reply],
-        "tool_result": state.get("tool_result")  # <- this line is already good
+        "messages": state["messages"] + [reply]
     }
 
 def chatbot2(state):
-    
     # Seed the prompt for reflection or summarization
     prompt = f"Summarize the key message of {state['bible_info']['book']} {state['bible_info']['chapter']}, here is the kjv version: {state['bible_info']['verses']}"
     reply = main_model.invoke([HumanMessage(content=prompt)])
@@ -141,7 +138,7 @@ graph_builder.add_edge(START, "chatbot1")
 graph = graph_builder.compile()
 
 print("=== Running the graph ===")
-for step in graph.stream({"messages": ["Can you pick a random verse for me?"], "test_param": 'hello', "bible_info": None}, stream_mode="updates"):
+for step in graph.stream({"messages": ["Can you pick a random verse for me?"], "bible_info": None}, stream_mode="updates"):
     node_name, delta = next(iter(step.items()))
     print(f"→ {node_name}")
     for k, v in delta.items():
