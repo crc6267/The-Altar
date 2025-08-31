@@ -18,6 +18,7 @@ from prompt import SYSTEM_PROMPT
 class State(TypedDict):
     messages: Annotated[list, add_messages]
     test_param: str
+    bible_info: Optional[dict]
 
 graph_builder = StateGraph(State)
 
@@ -27,19 +28,11 @@ main_model = ChatOllama(
     callbacks=[]
 ).bind_tools(BIBLE_TOOLS)
 
-your_name = "Jessica"
-your_name[0]
-
-roman = {
-    "isHeBoof?": True
-}
-
-roman["isHeBoof?"]
-
 def chatbot1(state):
     #Check if we have a tool_result to verify
     if state["messages"][-1] and isinstance(state["messages"][-1], ToolMessage):
         last_message = state["messages"][-1]
+        # NOTE: The tool message content is always a json string. You must parse it before treating it like an object
         content = json.loads(last_message.content)
         tool_result = content["tool_result"]
         print('\n\nIn chatbot1 with tool_result:', content, "\n\n")
@@ -53,9 +46,9 @@ def chatbot1(state):
         if book and chapter:
             # Add a clean handoff message but preserve state
             return  {
-                **state,
                 "messages": state["messages"] + [AIMessage(content=f"✅ Tool result received: {book} {chapter} with {len(verses)} verses.")],
                 "test_param": "New value from chatbot1",
+                "bible_info": {"book": book, "chapter": chapter, "verses": verses}
             }
         else:
             return {
@@ -71,26 +64,9 @@ def chatbot1(state):
     }
 
 def chatbot2(state):
-    result = state.get("tool_result", {})
-    print('\n\nIn chatbot2 with tool_result:', result, "\n\n")
-    book = result.get("book")
-    print('\n\nIn chatbot2 with book:', book, "\n\n")
-    chapter = result.get("chapter")
-    print('\n\nIn chatbot2 with chapter:', chapter, "\n\n")
-    verses = result.get("verses")
-    print('\n\nIn chatbot2 with verses:', verses[:100] if verses else None, "\n\n")
-    yo = state["test_param"]
-    print('\n\nIn chatbot2 with verses:', yo, "\n\n")
     
-
-    if not (book and chapter and verses):
-        return {
-            "messages": state["messages"] + [AIMessage(content="❌ Missing or invalid tool result; cannot proceed.")]
-            
-        }
-
     # Seed the prompt for reflection or summarization
-    prompt = f"Summarize the key message of {book} {chapter}:\n\n{verses[:3000]}"  # truncate to avoid overload
+    prompt = f"Summarize the key message of {state['bible_info']['book']} {state['bible_info']['chapter']}, here is the kjv version: {state['bible_info']['verses']}"
     reply = main_model.invoke([HumanMessage(content=prompt)])
 
     return {
@@ -165,7 +141,7 @@ graph_builder.add_edge(START, "chatbot1")
 graph = graph_builder.compile()
 
 print("=== Running the graph ===")
-for step in graph.stream({"messages": ["Can you pick a random verse for me?"], "test_param": 'hello'}, stream_mode="updates"):
+for step in graph.stream({"messages": ["Can you pick a random verse for me?"], "test_param": 'hello', "bible_info": None}, stream_mode="updates"):
     node_name, delta = next(iter(step.items()))
     print(f"→ {node_name}")
     for k, v in delta.items():
