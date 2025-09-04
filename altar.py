@@ -1,19 +1,18 @@
 from typing import Annotated, Optional
 from typing_extensions import TypedDict
+import json
+import traceback
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage, BaseMessage
 
-import json
-
-from langchain_ollama import ChatOllama
-
-import traceback
-
 from bible_tools import random_chapter, select_chapter
 BIBLE_TOOLS = [random_chapter, select_chapter]
+
+from models import main_model, embedding_model
+main_model.bind_tools(BIBLE_TOOLS)
 
 from prompt import SYSTEM_PROMPT
 
@@ -26,12 +25,6 @@ class State(TypedDict):
     user_input: Optional[str]
 
 graph_builder = StateGraph(State)
-
-main_model = ChatOllama(
-    model="gpt-oss:20b",
-    disable_streaming=False,
-    callbacks=[]
-).bind_tools(BIBLE_TOOLS)
 
 def chatbot1(state):
     # If there is a last message and its a tool message
@@ -87,6 +80,11 @@ def chatbot2(state):
     return {
         "messages": state["messages"] + [reply]
     }
+    
+def chatbot3(state):
+    prompt = """
+        You are an embedding model. Your job is to emb
+    """
 
 def boof_tool():
     '''
@@ -204,7 +202,7 @@ def stream_graph_updates(user_input: str):
         "messages": [
             {
                 "role": "system",
-                "content": "You are a helpful bible assistant"   
+                "content": "You are a helpful bible assistant. If the user asks to flip to a random chapter, use the random chapter tool. If they provide scripture or a passage, use the select chapter to tool to grab it."   
             },
             {"role": "user", "content": user_input}
         ],
