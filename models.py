@@ -4,7 +4,8 @@ main_model = ChatOllama(
     model="gpt-oss:20b",
     top_k=0,
     disable_streaming=False,
-    callbacks=[]
+    callbacks=[],
+    num_gpu=1
 )
 
 embedding_model = ChatOllama(
