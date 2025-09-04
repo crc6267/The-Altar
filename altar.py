@@ -14,6 +14,8 @@ BIBLE_TOOLS = [random_chapter, select_chapter]
 from models import main_model, embedding_model
 main_model.bind_tools(BIBLE_TOOLS)
 
+from embedding import embed_themes
+
 from prompt import SYSTEM_PROMPT
 
 # TODO: Make altar state class
@@ -27,10 +29,15 @@ class State(TypedDict):
 graph_builder = StateGraph(State)
 
 def chatbot1(state):
+    print('We are in chatbot1')
     # If there is a last message and its a tool message
     if state["messages"][-1] and isinstance(state["messages"][-1], ToolMessage):
+        print('we are in if')
         # Get most recent message
         last_message = state["messages"][-1]
+        # print("This is the last message", last_message
+        # TODO Investigate why the result comes back as none
+        # TODO Prompts need to be more robust and instructional, the LLM is not tool calling and messeing up a little bit
         # NOTE: The tool message content is always a json string. You must parse it before treating it like an object
         content = json.loads(last_message.content)
         # Now we can dissect the json object
@@ -81,10 +88,20 @@ def chatbot2(state):
         "messages": state["messages"] + [reply]
     }
     
-def chatbot3(state):
-    prompt = """
-        You are an embedding model. Your job is to emb
-    """
+def get_embeddings(state):
+    print('we are in get_embeddings')
+    last_message = state["messages"][-1]
+    print(last_message)
+    last_message = state["messages"][-1]
+    # NOTE: The tool message content is always a json string. You must parse it before treating it like an object
+    content = json.loads(last_message.content)
+    
+    result = embed_themes(content["anchor_theme"], content["user_theme"])
+    
+    return  {
+        "messages": state["messages"] + [AIMessage(content=f"✅ Result received: {result}")],
+    }
+    
 
 def boof_tool():
     '''
@@ -122,7 +139,7 @@ def route_to_boof_tools(state):
         raise ValueError(f"No messages found in input state to tool_edge: {state}")
     if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0:
         return "boof_tools"
-    return "__end__"
+    return "get_embeddings"
 
 graph_builder.add_node("chatbot1", chatbot1)
 graph_builder.add_node("chatbot2", chatbot2)
@@ -131,6 +148,7 @@ bible_tool_node = ToolNode(tools=BIBLE_TOOLS)
 boof_tool_node  = ToolNode(tools=BOOF_TOOLS)
 graph_builder.add_node("bible_tools", bible_tool_node)
 graph_builder.add_node("boof_tools",  boof_tool_node)
+graph_builder.add_node("get_embeddings", get_embeddings)
 
 # --- edges ---
 # From chatbot1: either use Bible tools (loop back) or continue to chatbot2
@@ -145,7 +163,7 @@ graph_builder.add_edge("bible_tools", "chatbot1")  # loop back after tools
 graph_builder.add_conditional_edges(
     "chatbot2",
     route_to_boof_tools,
-    {"boof_tools": "boof_tools", "__end__": END},
+    {"boof_tools": "boof_tools", "get_embeddings": "get_embeddings"},
 )
 graph_builder.add_edge("boof_tools", "chatbot2")   # loop back after tools
 

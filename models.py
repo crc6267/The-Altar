@@ -2,10 +2,9 @@ from langchain_ollama import ChatOllama
 
 main_model = ChatOllama(
     model="gpt-oss:20b",
-    top_k=0,
+    top_k=40,
     disable_streaming=False,
     callbacks=[],
-    num_gpu=1
 )
 
 embedding_model = ChatOllama(
