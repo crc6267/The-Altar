@@ -2,6 +2,7 @@ from typing import Annotated, Optional
 from typing_extensions import TypedDict
 import json
 import traceback
+import re
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
@@ -28,48 +29,70 @@ class State(TypedDict):
 
 graph_builder = StateGraph(State)
 
-def chatbot1(state):
-    print('We are in chatbot1')
-    # If there is a last message and its a tool message
-    if state["messages"][-1] and isinstance(state["messages"][-1], ToolMessage):
-        print('we are in if')
-        # Get most recent message
-        last_message = state["messages"][-1]
-        # print("This is the last message", last_message
-        # TODO Investigate why the result comes back as none
-        # TODO Prompts need to be more robust and instructional, the LLM is not tool calling and messeing up a little bit
-        # NOTE: The tool message content is always a json string. You must parse it before treating it like an object
+def chatbot1(state: State):
+    main_model.invoke(state["messages"])
+    
+    last_message = state["messages"][-1] if state["messages"] else None
+
+    if not last_message:
+        print("No last message found.")
+        return None
+
+    if not isinstance(last_message, ToolMessage):
+        reply = main_model.invoke(state["messages"])
+        return {
+            "messages": state["messages"] + [reply],
+            "bible_info": None,
+            "anchor_theme": None,
+            "user_input": state["user_input"],
+            "user_theme": None,
+        }
+
+    if not last_message.content or last_message.content == "":
+        print("Tool message content is empty.")
+        return None
+
+    print("this is the last message:", last_message.content)
+    if isinstance(last_message.content, str):
         content = json.loads(last_message.content)
-        # Now we can dissect the json object
-        tool_result = content["tool_result"]
-        book = tool_result["book"]
+    else:
+        content = last_message.content  # already parsed JSON
+        
+    if isinstance(content, dict):
+        tool_result = content.get("tool_result", {})
+        book = tool_result.get("book")
         chapter = tool_result.get("chapter")
         verses = tool_result.get("verses")
-        
-        if book and chapter and verses:
-            # Update the state
-            # TODO Perhaps we can make a change state function that decides what to do, that way the logic is centralized
-            return  {
-                "messages": state["messages"] + [AIMessage(content=f"✅ Tool result received: {book} {chapter} with {len(verses)} verses.")],
-                "bible_info": {"book": book, "chapter": chapter, "verses": verses},
-                "anchor_theme": None,
-                "user_theme": None,
-                "user_input": state["user_input"],
-                
-            }
-        else:
-            return {
-                "messages": state["messages"] + [AIMessage(content="❌ Invalid tool result.")],
-                "tool_result_verified": False
-            }
+    else:
+        print("Unexpected content format — expected dict, got list.")
+        return {
+            "messages": state["messages"] + [AIMessage(content="❌ Unexpected tool result format.")],
+            "tool_result_verified": False
+        }
 
-    # Normal model behavior
-    reply = main_model.invoke(state["messages"])
-    return {
-        "messages": state["messages"] + [reply]
-    }
+
+    if book and chapter and verses:
+        # Update the state
+        # TODO Perhaps we can make a change state function that decides what to do, that way the logic is centralized
+        return  {
+            "messages": state["messages"] + [AIMessage(content=f"✅ Tool result received: {book} {chapter} with {len(verses)} verses.")],
+            "bible_info": {"book": book, "chapter": chapter, "verses": verses},
+            "anchor_theme": None,
+            "user_theme": None,
+            "user_input": state["user_input"],
+            
+        }
+    else:
+        return {
+            "messages": state["messages"] + [AIMessage(content="❌ Invalid tool result.")],
+            "bible_info": None,
+            "anchor_theme": None,
+            "user_input": None,
+            "user_theme": None,
+        }
 
 def chatbot2(state):
+    
     # Seed the prompt for reflection or summarization
     prompt = f"""
         You are a summarizer and literary analyzer. Your job is to provide a 3 word summary or analysis of two things - The users statement and the bible verse provided.
@@ -80,10 +103,10 @@ def chatbot2(state):
         
         Here is the user's input: {state["user_input"]}
         
-        Please return the format as a json string with the keys "anchor_theme" and "user_theme"
+        Please return as a json with the keys "anchor_theme" and "user_theme"
         """
     reply = main_model.invoke([HumanMessage(content=prompt)])
-
+    
     return {
         "messages": state["messages"] + [reply]
     }
@@ -93,8 +116,13 @@ def get_embeddings(state):
     last_message = state["messages"][-1]
     print(last_message)
     last_message = state["messages"][-1]
+    
     # NOTE: The tool message content is always a json string. You must parse it before treating it like an object
-    content = json.loads(last_message.content)
+    content = last_message.content
+    clean_json = re.sub(r"^```json\n|```$", "", content.strip())
+    content = json.loads(clean_json)
+    
+    print('\n\n\nThis is the cleaned Json', clean_json)
     
     result = embed_themes(content["anchor_theme"], content["user_theme"])
     
@@ -171,56 +199,28 @@ graph_builder.add_edge(START, "chatbot1")
 
 graph = graph_builder.compile()
 
-print("=== Running the graph ===")
-# for step in graph.stream({"messages": ["Can you pick a random verse for me?"], "bible_info": None}, stream_mode="updates"):
-#     node_name, delta = next(iter(step.items()))
-#     print(f"→ {node_name}")
-#     for k, v in delta.items():
-#         print(f"   {k}: {v}")
-
-# from IPython.display import Image, display
-
-# from pathlib import Path
-
-# Get the PNG bytes from LangGraph
-# png_bytes = graph.get_graph().draw_mermaid_png()
-
-# Try to render in a notebook; otherwise save to a file
-
-# from pathlib import Path
-# import os
-# import traceback
-
-# def save_langgraph_png(graph, outpath="langgraph.png"):
-#     try:
-#         obj = graph.get_graph().draw_mermaid_png()  # may return bytes or an IPython Image-like
-#         # Normalize to raw PNG bytes
-#         if isinstance(obj, (bytes, bytearray)):
-#             png = bytes(obj)
-#         elif hasattr(obj, "data"):  # IPython Image-like
-#             png = obj.data
-#         elif hasattr(obj, "getvalue"):  # BytesIO-like
-#             png = obj.getvalue()
-#         else:
-#             raise TypeError(f"Unexpected return type: {type(obj)}")
-#         out = Path(outpath).resolve()
-#         out.write_bytes(png)
-#         print(f"✅ Saved graph to: {out}")
-#         print(f"📂 Current working dir was: {Path.cwd()}")
-#     except Exception:
-#         print("❌ Failed to render/save the graph. Full traceback:")
-#         traceback.print_exc()
-
-# # call it:
-# save_langgraph_png(graph, "langgraph.png")
-
 def stream_graph_updates(user_input: str):
     seen = None
     for event in graph.stream({
         "messages": [
             {
                 "role": "system",
-                "content": "You are a helpful bible assistant. If the user asks to flip to a random chapter, use the random chapter tool. If they provide scripture or a passage, use the select chapter to tool to grab it."   
+                "content": '''
+                    The user is going to give you a sitation they are struggling with. They will also either provide you with bible verse you ask you to flip to a chapter.
+                
+                    You are only to call and execute the tools that are avaiable to you. Your job is to only call the functions to retrieve a result depending on what the user is asking for.
+                    
+                    These tools are random_chapter and select_chapter.
+                    
+                    random_chapter does not require any parameters as is used when the user asks for a chapter.
+                    
+                    select_chapter requires:
+                        book_name: str
+                        book_chapter: str
+                        
+                    select chapter is called when the user provides you with scripture.
+                    
+                '''   
             },
             {"role": "user", "content": user_input}
         ],
