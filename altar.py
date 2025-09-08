@@ -114,8 +114,6 @@ def chatbot2(state):
 def get_embeddings(state):
     print('we are in get_embeddings')
     last_message = state["messages"][-1]
-    print(last_message)
-    last_message = state["messages"][-1]
     
     # NOTE: The tool message content is always a json string. You must parse it before treating it like an object
     content = last_message.content
