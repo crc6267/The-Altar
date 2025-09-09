@@ -92,6 +92,7 @@ def chatbot1(state: State):
         }
 
 def chatbot2(state):
+    # TODO: Maybe add some error handling here to ensure the prompt is not None and all that good stuff
     prompt = summarize_themes(book=state["bible_info"]["book"], chapter=state["bible_info"]["chapter"], verses=state["bible_info"]["verses"], user_input=state["user_input"])
     reply = main_model.invoke([HumanMessage(content=prompt)])
     
@@ -115,15 +116,6 @@ def get_embeddings(state):
     return  {
         "messages": state["messages"] + [AIMessage(content=f"✅ Result received: {result}")],
     }
-    
-
-def boof_tool():
-    '''
-     A dummy tool to demonstrate multiple tool nodes.
-     '''
-    return 'boof tool'
-
-BOOF_TOOLS = [boof_tool]
 
 # --- routers ---
 def route_to_bible_tools(state):
@@ -146,9 +138,7 @@ graph_builder.add_node("chatbot1", chatbot1)
 graph_builder.add_node("chatbot2", chatbot2)
 
 bible_tool_node = ToolNode(tools=BIBLE_TOOLS)
-boof_tool_node  = ToolNode(tools=BOOF_TOOLS)
 graph_builder.add_node("bible_tools", bible_tool_node)
-graph_builder.add_node("boof_tools",  boof_tool_node)
 graph_builder.add_node("get_embeddings", get_embeddings)
 
 # --- edges ---
