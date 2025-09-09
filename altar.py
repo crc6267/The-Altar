@@ -17,7 +17,7 @@ main_model.bind_tools(BIBLE_TOOLS)
 
 from embedding import embed_themes
 
-from prompt import SYSTEM_PROMPT
+from prompts import summarize_themes
 
 # TODO: Make altar state class
 class State(TypedDict):
@@ -92,19 +92,7 @@ def chatbot1(state: State):
         }
 
 def chatbot2(state):
-    
-    # Seed the prompt for reflection or summarization
-    prompt = f"""
-        You are a summarizer and literary analyzer. Your job is to provide a 3 word summary or analysis of two things - The users statement and the bible verse provided.
-        
-        The bible summarization will serve as the anchor theme for the rest of this program.
-        
-        Here is the Bible verse to summarize: {state['bible_info']['book']} {state['bible_info']['chapter']}: {state['bible_info']['verses']}
-        
-        Here is the user's input: {state["user_input"]}
-        
-        Please return as a json with the keys "anchor_theme" and "user_theme"
-        """
+    prompt = summarize_themes(book=state["bible_info"]["book"], chapter=state["bible_info"]["chapter"], verses=state["bible_info"]["verses"], user_input=state["user_input"])
     reply = main_model.invoke([HumanMessage(content=prompt)])
     
     return {
