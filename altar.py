@@ -154,19 +154,6 @@ def route_to_bible_tools(state):
         return "bible_tools"
     return "chatbot2"
 
-
-def route_to_boof_tools(state):
-    # if tools_condition(state) is True -> run tools; else end
-    if isinstance(state, list):
-        ai_message = state[-1]
-    elif messages := state.get("messages", []):
-        ai_message = messages[-1]
-    else:
-        raise ValueError(f"No messages found in input state to tool_edge: {state}")
-    if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0:
-        return "boof_tools"
-    return "get_embeddings"
-
 graph_builder.add_node("chatbot1", chatbot1)
 graph_builder.add_node("chatbot2", chatbot2)
 
@@ -185,13 +172,7 @@ graph_builder.add_conditional_edges(
 )
 graph_builder.add_edge("bible_tools", "chatbot1")  # loop back after tools
 
-# From chatbot2: either use Boof tools (loop back) or end
-graph_builder.add_conditional_edges(
-    "chatbot2",
-    route_to_boof_tools,
-    {"boof_tools": "boof_tools", "get_embeddings": "get_embeddings"},
-)
-graph_builder.add_edge("boof_tools", "chatbot2")   # loop back after tools
+graph_builder.add_edge("chatbot2", "get_embeddings")
 
 graph_builder.add_edge(START, "chatbot1")
 
