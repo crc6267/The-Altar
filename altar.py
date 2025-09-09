@@ -17,7 +17,7 @@ main_model.bind_tools(BIBLE_TOOLS)
 
 from embedding import embed_themes
 
-from prompts import summarize_themes
+from prompts import summarize_themes, init_system_prompt
 
 # TODO: Make altar state class
 class State(TypedDict):
@@ -172,22 +172,7 @@ def stream_graph_updates(user_input: str):
         "messages": [
             {
                 "role": "system",
-                "content": '''
-                    The user is going to give you a sitation they are struggling with. They will also either provide you with bible verse you ask you to flip to a chapter.
-                
-                    You are only to call and execute the tools that are avaiable to you. Your job is to only call the functions to retrieve a result depending on what the user is asking for.
-                    
-                    These tools are random_chapter and select_chapter.
-                    
-                    random_chapter does not require any parameters as is used when the user asks for a chapter.
-                    
-                    select_chapter requires:
-                        book_name: str
-                        book_chapter: str
-                        
-                    select chapter is called when the user provides you with scripture.
-                    
-                '''   
+                "content": init_system_prompt()  
             },
             {"role": "user", "content": user_input}
         ],
